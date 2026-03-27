@@ -1,0 +1,6 @@
+{
+    "name": "Admin",
+    "email": "admin@elemenopee.com",
+    "password": "adminpassword123",
+    "role": "admin"
+}
