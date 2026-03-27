@@ -76,31 +76,41 @@ router.get(
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const startOfYear = new Date(now.getFullYear(), 0, 1);
 
+      const SALE_FILTER = {
+        isDeleted: { $ne: true },
+        $or: [
+          { paymentStatus: "paid" }, // Any paid order is a sale
+          { paymentMethod: "COD", orderStatus: { $ne: "pending" } } // COD is only a sale once confirmed (not just pending)
+        ],
+        orderStatus: { $nin: ["cancelled", "refunded"] },
+        paymentStatus: { $nin: ["failed", "refunded"] }
+      };
+
       const [daily, weekly, monthly, yearly, allOrders] = await Promise.all([
         Order.aggregate([
-          { $match: { createdAt: { $gte: startOfDay }, paymentStatus: { $ne: "failed" }, orderStatus: { $nin: ["cancelled", "refunded"] }, isDeleted: { $ne: true } } },
+          { $match: { ...SALE_FILTER, createdAt: { $gte: startOfDay } } },
           { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
         ]),
         Order.aggregate([
-          { $match: { createdAt: { $gte: startOfWeek }, paymentStatus: { $ne: "failed" }, orderStatus: { $nin: ["cancelled", "refunded"] }, isDeleted: { $ne: true } } },
+          { $match: { ...SALE_FILTER, createdAt: { $gte: startOfWeek } } },
           { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
         ]),
         Order.aggregate([
-          { $match: { createdAt: { $gte: startOfMonth }, paymentStatus: { $ne: "failed" }, orderStatus: { $nin: ["cancelled", "refunded"] }, isDeleted: { $ne: true } } },
+          { $match: { ...SALE_FILTER, createdAt: { $gte: startOfMonth } } },
           { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
         ]),
         Order.aggregate([
-          { $match: { createdAt: { $gte: startOfYear }, paymentStatus: { $ne: "failed" }, orderStatus: { $nin: ["cancelled", "refunded"] }, isDeleted: { $ne: true } } },
+          { $match: { ...SALE_FILTER, createdAt: { $gte: startOfYear } } },
           { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
         ]),
-        Order.find({ paymentStatus: { $ne: "failed" }, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).limit(10)
+        Order.find({ ...SALE_FILTER }).sort({ createdAt: -1 }).limit(10)
       ]);
 
       // Last 30 days breakdown
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const dailyBreakdown = await Order.aggregate([
-        { $match: { createdAt: { $gte: thirtyDaysAgo }, paymentStatus: { $ne: "failed" }, orderStatus: { $nin: ["cancelled", "refunded"] }, isDeleted: { $ne: true } } },
+        { $match: { ...SALE_FILTER, createdAt: { $gte: thirtyDaysAgo } } },
         {
           $group: {
             _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
@@ -131,7 +141,17 @@ router.get(
   conditionalAuthenticate,
   async (req, res) => {
     try {
-      const orders = await Order.find({ isDeleted: { $ne: true } });
+      const SALE_FILTER = {
+        isDeleted: { $ne: true },
+        $or: [
+          { paymentStatus: "paid" },
+          { paymentMethod: "COD", orderStatus: { $ne: "pending" } }
+        ],
+        orderStatus: { $nin: ["cancelled", "refunded"] },
+        paymentStatus: { $nin: ["failed", "refunded"] }
+      };
+
+      const orders = await Order.find(SALE_FILTER);
       
       const data = [];
       for (const order of orders) {
