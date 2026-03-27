@@ -20,17 +20,18 @@ const app = express();
 
 // Middleware
 app.use(express.json());
+
+// Permissive CORS for deployment
 app.use(cors({
-  origin: [
-    "https://elemenopee.vercel.app",
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "https://elemenopee-dashboard.vercel.app", // your Vercel frontend
-    "http://localhost:3000" // optional for local dev
-  ],
+  origin: true,
   credentials: true,
 }));
+
+// Request Logger
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Origin: ${req.get('origin')}`);
+  next();
+});
 
 // Swagger Documentation
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
