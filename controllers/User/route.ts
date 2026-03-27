@@ -87,15 +87,28 @@ router.post(
       }
 
       let user = await User.findOne({ firebaseUid });
+      
+      // If no user with firebaseUid, check if they exist by email already
+      if (!user && email) {
+        user = await User.findOne({ email });
+        if (user) {
+          // Link the NEW firebaseUid to the EXISTING user with this email
+          user.firebaseUid = firebaseUid;
+          await user.save();
+        }
+      }
+
       if (!user) {
+        // Create new user if no match found anywhere
         user = new User({ firebaseUid, name, email, phone, gender });
         await user.save();
       } else {
+        // Sync other details if they already existed
         const changed =
           (name && user.name !== name) ||
           (email && user.email !== email) ||
           (phone && user.phone !== phone) ||
-          (gender && user.gender !== gender);
+          (gender && (user as any).gender !== gender);
         if (changed) {
           if (name) user.name = name;
           if (email) user.email = email;
