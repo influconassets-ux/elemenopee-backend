@@ -30,14 +30,60 @@ export const extractFileId = (url: string): string | null => {
     return null;
 };
 
-// Helper to upload image (either Buffer or URL) to Cloudinary using unsigned upload
+// Helper to download image with multiple format fallbacks and status reporting
+const downloadImageAsBuffer = async (url: string, fileId?: string): Promise<Buffer | null> => {
+    const urlsToTry = fileId ? [
+        `https://lh3.googleusercontent.com/d/${fileId}`,
+        `https://drive.google.com/uc?export=download&id=${fileId}`,
+        `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`
+    ] : [url];
+
+    for (const fetchUrl of urlsToTry) {
+        try {
+            console.log(`[Image Download] Attempting fetch: ${fetchUrl.substring(0, 70)}...`);
+            const response = await axios.get(fetchUrl, {
+                responseType: "arraybuffer",
+                timeout: 20000,
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+                },
+            });
+
+            const contentType = response.headers['content-type'] || '';
+            const byteLength = response.data?.byteLength || 0;
+
+            if (contentType.includes('text/html') || byteLength < 1000) {
+                console.warn(`[Image Download] ⚠️ Warning: Link returned a webpage/small file instead of an image. Content-Type: ${contentType}`);
+                if (fetchUrl.includes('dropbox.com')) {
+                    console.warn(`[Dropbox Alert] 🔒 This link might be PRIVATE or requires a login. Ensure it's set to "Anyone with the link".`);
+                }
+                continue; // Try next fallback if exists
+            }
+
+            const buffer = Buffer.from(response.data);
+            const header = buffer.toString('hex', 0, 4);
+            const isValidImage = /^(ffd8ff|89504e47|47494638|52494646)/.test(header);
+            
+            if (isValidImage) {
+                console.log(`[Image Download] ✅ Success! Fetched ${byteLength} bytes (${contentType})`);
+                return buffer;
+            } else {
+                console.warn(`[Image Download] ⚠️ File is not a valid image format. Header: ${header}`);
+            }
+        } catch (err: any) {
+            console.warn(`[Image Download Failed] ${err.message} (Status: ${err.response?.status || 'N/A'})`);
+        }
+    }
+    return null;
+};
+
+// Helper to upload to Cloudinary with Quota Detection
 const uploadToCloudinary = async (fileSource: Buffer | string, filename: string): Promise<string | null> => {
     try {
         const formData = new FormData();
-        
-        // Cloudinary accepts a Buffer, a Base64 string, or a URL in the 'file' field
         if (Buffer.isBuffer(fileSource)) {
-            formData.append("file", fileSource, { filename });
+            formData.append("file", fileSource, { filename, contentType: 'image/jpeg' });
         } else {
             formData.append("file", fileSource);
         }
@@ -47,99 +93,77 @@ const uploadToCloudinary = async (fileSource: Buffer | string, filename: string)
         const res = await axios.post(
             "https://api.cloudinary.com/v1_1/driz5nrim/image/upload",
             formData,
-            {
-                headers: {
-                    ...formData.getHeaders(),
-                },
-                timeout: 60000 // Cloudinary can take time if fetching from a slow URL
-            }
+            { headers: { ...formData.getHeaders() } }
         );
         return res.data.secure_url;
     } catch (err: any) {
-        console.error("Cloudinary upload error:", err?.response?.data || err.message);
+        const errorData = err?.response?.data;
+        if (JSON.stringify(errorData).includes("Quota exceeded") || JSON.stringify(errorData).includes("Over limit")) {
+            console.error("🚨 CRITICAL: Cloudinary account (driz5nrim) is OVER QUOTA. No more images can be uploaded.");
+        } else {
+            console.error("Cloudinary Error Log:", JSON.stringify(errorData || err.message));
+        }
         return null;
     }
 };
 
-// Detect if URL is Dropbox and convert it to a raw download link
+// Advanced Dropbox Transformer
 const getDropboxDirectLink = (url: string): string | null => {
     if (!url.includes('dropbox.com')) return null;
     
-    // Replace dl=0 with raw=1 if present
-    if (url.includes('dl=0')) {
-        return url.replace('dl=0', 'raw=1');
-    }
+    // Convert shortlinks or restricted links
+    let directUrl = url.split('?')[0];
     
-    // If it already has raw=1 or dl=1, it might already be direct
-    if (url.includes('raw=1') || url.includes('dl=1')) {
-        return url;
+    // Handle rlkey for shared links
+    const rlkeyMatch = url.match(/rlkey=([a-zA-Z0-9_-]+)/);
+    const rlkeyParam = rlkeyMatch ? `&rlkey=${rlkeyMatch[1]}` : '';
+    
+    // Dropbox direct serving endpoints
+    if (directUrl.includes('www.dropbox.com')) {
+        return directUrl + '?raw=1' + rlkeyParam;
+    } else {
+        return directUrl.replace('dropbox.com', 'dl.dropboxusercontent.com') + (rlkeyParam ? '?' + rlkeyParam.substring(1) : '');
     }
-
-    // Append raw=1 if no relevant parameters found (it's safe anyway)
-    const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}raw=1`;
 };
 
 export const fetchImagesFromDirectLinks = async (linksString: string): Promise<string[]> => {
-    // Convert to string and handle any hidden characters
-    const normalizedString = String(linksString).replace(/[\u200b-\u200d\ufeff]/g, '');
+    if (!linksString || typeof linksString !== 'string') return [];
 
-    // Robust way to find all URLs. Splitting by space, comma, semicolon or newline
-    const links = normalizedString.match(/https?:\/\/[^\s,;]+(?:\?[^\s,;]*)?/g) || [];
+    const normalizedString = linksString.replace(/[\u200b-\u200d\ufeff]/g, '').trim();
+    const links = normalizedString.match(/(?:https?:\/\/|www\.)[^\s,;|]+(?:\?[^\s,;|]*)?/g) || [];
     
-    if (links.length === 0) {
-        console.warn("[Image Extractor] No valid URLs found in:", normalizedString);
-        return [];
-    }
-
-    console.log(`[Image Extractor] Found ${links.length} links:`);
-    links.forEach((l, i) => console.log(`  ${i+1}: ${l}`));
+    if (links.length === 0) return [];
 
     const processLink = async (url: string, index: number): Promise<string | null> => {
-        let downloadUrl = '';
-        let fileIdForCloudinary = `product_${Date.now()}_${index}_${Math.floor(Math.random() * 1000)}`;
-
         try {
-            // Check if it's a Dropbox link
-            if (url.includes('dropbox.com')) {
-                downloadUrl = getDropboxDirectLink(url) || url;
+            let imageBuffer: Buffer | null = null;
+            let finalUrl = url.startsWith('www.') ? `https://${url}` : url;
+
+            if (finalUrl.includes('drive.google.com') || finalUrl.includes('docs.google.com')) {
+                const fileId = extractFileId(finalUrl) || '';
+                if (!fileId) return null;
+                imageBuffer = await downloadImageAsBuffer('', fileId);
             } 
-            // Check if it's a Google Drive link
-            else if (url.includes('drive.google.com')) {
-                const fileId = extractFileId(url);
-                if (!fileId) {
-                    console.warn(`[Image Fetch] Not a valid Drive file link: ${url}`);
-                    return null;
-                }
-                downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-            }
-            // Fallback for other direct URLs
-            else if (url.startsWith('http')) {
-                downloadUrl = url;
+            else if (finalUrl.includes('dropbox.com')) {
+                const downloadUrl = getDropboxDirectLink(finalUrl) || finalUrl;
+                imageBuffer = await downloadImageAsBuffer(downloadUrl);
             }
             else {
-                return null;
+                imageBuffer = await downloadImageAsBuffer(finalUrl);
             }
 
-            console.log(`[Image Fetch] Processing: ${downloadUrl}`);
-            const result = await uploadToCloudinary(downloadUrl, `${fileIdForCloudinary}.jpg`);
-            if (result) {
-                console.log(`[Image Fetch] Success: ${result}`);
+            if (imageBuffer) {
+                return await uploadToCloudinary(imageBuffer, `import_${Date.now()}_${index}.jpg`);
             } else {
-                console.warn(`[Image Fetch] Failed for: ${downloadUrl}`);
+                console.log(`[Processor] Local download failed for ${finalUrl.substring(0, 30)}...`);
+                return null;
             }
-            return result;
         } catch (err: any) {
-            console.error(`[Image Fetch] Critical error for ${url}:`, err.message);
+            console.error(`[Processor] Row Fetch Error:`, err.message);
             return null;
         }
     };
 
-    // Run all fetches in parallel
     const results = await Promise.all(links.map((link, idx) => processLink(link, idx)));
-    
-    // Filter out nulls and return valid URLs
-    const finalImages = results.filter((url): url is string => url !== null);
-    console.log(`✅ Successfully uploaded ${finalImages.length}/${links.length} images to Cloudinary`);
-    return finalImages;
+    return results.filter((url): url is string => !!url);
 };
