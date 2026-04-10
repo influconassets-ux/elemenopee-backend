@@ -37,23 +37,41 @@ router.post("/bulk-upload", upload.single("file"), async (req, res) => {
     const processRow = async (row: any, index: number) => {
       try {
         const item = row as any;
-        const title = getVal(item, "title", ["name", "productName", "product", "item"]);
-        const description = getVal(item, "description", ["desc", "details", "info"]);
-        const price = getVal(item, "price", ["mrp", "cost", "originalPrice", "rate"]);
-        const discountedPrice = getVal(item, "discountedPrice", ["salePrice", "offerPrice", "discountPrice", "priceWithDiscount"]);
+        const title = getVal(item, "title", ["name", "productName", "product", "item", "Product Name"]);
+        const description = getVal(item, "description", ["desc", "details", "info", "Product Description"]);
+        const price = getVal(item, "price", ["mrp", "cost", "originalPrice", "rate", "MRP"]);
+        const discountedPrice = getVal(item, "discountedPrice", ["salePrice", "offerPrice", "discountPrice", "priceWithDiscount", "Selling Price", "sellingPrice"]);
         const discountPercent = getVal(item, "discountPercent", ["discount", "off", "percentage"]);
-        const category = getVal(item, "category", ["cat", "collection", "type"]);
-        const sizeString = getVal(item, "size", ["sizes", "dimension", "dimensions"]);
-        const skuId = getVal(item, "skuId", ["sku", "id", "code", "articleNumber"]);
-        const variations = getVal(item, "variations", ["variants", "options"]);
-        const tagsString = getVal(item, "tags", ["keywords", "labels"]);
+        const category = getVal(item, "category", ["cat", "collection", "type", "Category"]);
+        const subCategory = getVal(item, "subCategory", ["sub-category", "subcategory", "Sub-Category", "Sub Category"]);
+        const gender = getVal(item, "gender", ["Gender", "sex"]);
+        const ageGroup = getVal(item, "ageGroup", ["age group", "agegroup", "Age Group", "age"]);
+        const sizeString = getVal(item, "size", ["sizes", "dimension", "dimensions", "Size Range", "sizeRange"]);
+        const skuId = getVal(item, "skuId", ["sku", "id", "code", "articleNumber", "SKU ID", "styleCode", "Style Code"]);
+        const variations = getVal(item, "variations", ["variants", "options", "Color Options", "colorOptions"]);
+        const tagsString = getVal(item, "tags", ["keywords", "labels", "Key Features"]);
         
+        // Support both comma-separated links column AND individual Photo 1-5 columns
         const rawDriveLinks = getVal(item, "googleDriveImageLinks", [
           "imageLinks", "productImages", "imageUrl", "images", "googleDriveLinks", 
           "image", "imageLink", "img", "photoLinks", "photos", "link", 
           "googleDriveImageLinks / imageLinks"
         ]);
-        const driveLinks = rawDriveLinks ? String(rawDriveLinks) : "";
+        
+        // If no single links column, try individual Photo columns
+        let driveLinks = rawDriveLinks ? String(rawDriveLinks) : "";
+        if (!driveLinks.trim()) {
+          const photoLinks: string[] = [];
+          for (let p = 1; p <= 5; p++) {
+            const photo = getVal(item, `Photo ${p}`, [`photo${p}`, `image${p}`, `Photo${p}`]);
+            if (photo && String(photo).trim()) {
+              photoLinks.push(String(photo).trim());
+            }
+          }
+          if (photoLinks.length > 0) {
+            driveLinks = photoLinks.join(",");
+          }
+        }
 
         let images: string[] = [];
         if (driveLinks && driveLinks.trim() !== "") {
@@ -65,13 +83,26 @@ router.post("/bulk-upload", upload.single("file"), async (req, res) => {
  
         console.log(`[Bulk Row ${index + 2}] Title: ${title}, Images Fetched: ${images.length}`);
 
+        // Auto-calculate discount percentage from MRP and Selling Price
+        const parsedPrice = typeof price === "number" ? price : parseFloat(String(price).replace(/[^\d.-]/g, "")) || 0;
+        const parsedDiscountedPrice = typeof discountedPrice === "number" ? discountedPrice : parseFloat(String(discountedPrice).replace(/[^\d.-]/g, "")) || 0;
+        let parsedDiscountPercent = typeof discountPercent === "number" ? discountPercent : parseFloat(String(discountPercent || "0").replace(/[^\d.-]/g, "")) || 0;
+        
+        // Auto-calc if not provided but MRP & SP are available
+        if (!parsedDiscountPercent && parsedPrice > 0 && parsedDiscountedPrice > 0 && parsedDiscountedPrice < parsedPrice) {
+          parsedDiscountPercent = Math.round(((parsedPrice - parsedDiscountedPrice) / parsedPrice) * 100);
+        }
+
         const productData = {
           title: title,
           description: description,
-          price: typeof price === "number" ? price : parseFloat(String(price).replace(/[^\d.-]/g, "")) || 0,
-          discountedPrice: typeof discountedPrice === "number" ? discountedPrice : parseFloat(String(discountedPrice).replace(/[^\d.-]/g, "")) || 0,
-          discountPercent: typeof discountPercent === "number" ? discountPercent : parseFloat(String(discountPercent).replace(/[^\d.-]/g, "")) || 0,
-          category: category,
+          price: parsedPrice,
+          discountedPrice: parsedDiscountedPrice,
+          discountPercent: parsedDiscountPercent,
+          category: category ? String(category).toLowerCase() : undefined,
+          subCategory: subCategory ? String(subCategory).toLowerCase() : undefined,
+          gender: gender ? String(gender).toLowerCase() : undefined,
+          ageGroup: ageGroup ? String(ageGroup).toLowerCase() : undefined,
           size: typeof sizeString === "string" ? sizeString.split(",").map((s: string) => s.trim()) : [],
           skuId: skuId,
           variations: variations,

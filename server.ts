@@ -11,6 +11,10 @@ import orderRoutes from "./routes/orderRoutes.js";
 import abandonedCartRoutes from "./routes/abandonedCartRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import updateRoutes from "./routes/updateRoutes.js";
+import homeCategoryRoutes from "./routes/homeCategoryRoutes.js";
+import homeHeroCategoryRoutes from "./routes/homeHeroCategoryRoutes.js";
+import homeLatestStyleRoutes from "./routes/homeLatestStyleRoutes.js";
+import reviewRoutes from "./routes/reviewRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import { specs } from "./swagger.js";
 
@@ -49,6 +53,10 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/abandoned-carts", abandonedCartRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/home-categories", homeCategoryRoutes);
+app.use("/api/home-hero-categories", homeHeroCategoryRoutes);
+app.use("/api/home-latest-styles", homeLatestStyleRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // Health check endpoint for render
 app.get("/health", (req, res) => {
