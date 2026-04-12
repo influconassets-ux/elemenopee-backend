@@ -17,7 +17,32 @@ export const ProductCreateSchema = z.object({
   imageUrl: z.string().url('Invalid image URL').or(z.string().startsWith('/')).or(z.literal('')).optional(),
   images: z.array(z.string().url().or(z.string().startsWith('/')).or(z.literal('')).or(z.null())).optional(),
   variations: z.string().optional(),
-  tags: z.array(z.string()).optional()
+  tags: z.array(z.string()).optional(),
+  fabric: z.string().optional(),
+  material: z.string().optional(),
+  washCare: z.string().optional(),
+  whatsIncluded: z.string().optional(),
+  styleCode: z.string().optional(),
+  countryOfOrigin: z.string().optional(),
+  sizeRange: z.string().optional(),
+  fitType: z.string().optional(),
+  length: z.string().optional(),
+  chestWaist: z.string().optional(),
+  shoulderWidth: z.string().optional(),
+  sleeveLength: z.string().optional(),
+  neckType: z.string().optional(),
+  closureType: z.string().optional(),
+  fabricComposition: z.string().optional(),
+  fabricType: z.string().optional(),
+  gsm: z.string().optional(),
+  breathability: z.string().optional(),
+  softness: z.string().optional(),
+  skinFriendly: z.string().optional(),
+  seasonSuitability: z.string().optional(),
+  transparent: z.string().optional(),
+  patternPrint: z.string().optional(),
+  printPlacement: z.string().optional(),
+  printTechnique: z.string().optional()
 });
 
 export const ProductUpdateSchema = ProductCreateSchema.partial();

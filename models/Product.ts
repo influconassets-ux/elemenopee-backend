@@ -15,7 +15,32 @@ const productSchema = new mongoose.Schema({
   imageUrl: String,
   images: [String],
   variations: String,
-  tags: [String]
+  tags: [String],
+  fabric: String,
+  material: String,
+  washCare: String,
+  whatsIncluded: String,
+  styleCode: String,
+  countryOfOrigin: String,
+  sizeRange: String,
+  fitType: String,
+  length: String,
+  chestWaist: String,
+  shoulderWidth: String,
+  sleeveLength: String,
+  neckType: String,
+  closureType: String,
+  fabricComposition: String,
+  fabricType: String,
+  gsm: String,
+  breathability: String,
+  softness: String,
+  skinFriendly: String,
+  seasonSuitability: String,
+  transparent: String,
+  patternPrint: String,
+  printPlacement: String,
+  printTechnique: String
 }, { timestamps: true });
 
 const Product = mongoose.model("Product", productSchema);
