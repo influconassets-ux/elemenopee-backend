@@ -22,14 +22,35 @@ dotenv.config();
 
 const app = express();
 
-// Middleware
+// 1. CORS MUST be the very first middleware for preflight (OPTIONS) requests to work
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5000",
+  "https://sensational-sawine-303205.netlify.app",
+  "https://dashboard.viridiv.com", // Found in previous session summaries
+  "https://viridiv.com"
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes("onrender.com") || origin.includes("netlify.app")) {
+      callback(null, true);
+    } else {
+      // For production, you might want to be stricter, but let's be safe for now
+      callback(null, true); 
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
+}));
+
+// 2. Body Parser
 app.use(express.json());
 
-// Permissive CORS for deployment
-app.use(cors({
-  origin: true,
-  credentials: true,
-}));
+// 3. Request Logger (move after CORS to see what's happening)
 
 // Request Logger
 app.use((req, res, next) => {
