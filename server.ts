@@ -59,9 +59,6 @@ app.use(cors({
   optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
 
-// Explicitly handle OPTIONS preflight requests for all routes (Express 5 syntax)
-app.options("(.*)", cors());
-
 // 2. Body Parser
 app.use(express.json());
 
