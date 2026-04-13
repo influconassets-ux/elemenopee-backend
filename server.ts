@@ -4,7 +4,11 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 // Schema fix: imageUrl now accepts empty strings
-dns.setServers(["8.8.8.8", "1.1.1.1"]);
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+} catch (err) {
+  console.warn("Notice: Could not set custom DNS servers, using system defaults.");
+}
 import swaggerUi from "swagger-ui-express";
 import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
@@ -22,30 +26,41 @@ dotenv.config();
 
 const app = express();
 
-// 1. CORS MUST be the very first middleware for preflight (OPTIONS) requests to work
+// 1. CORS Configuration
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5000",
   "https://sensational-sawine-303205.netlify.app",
-  "https://dashboard.viridiv.com", // Found in previous session summaries
-  "https://viridiv.com"
+  "https://dashboard.viridiv.com",
+  "https://viridiv.com",
+  "https://elemenopee.netlify.app"
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes("onrender.com") || origin.includes("netlify.app")) {
+    
+    const isAllowed = allowedOrigins.includes(origin) || 
+                     origin.endsWith(".netlify.app") || 
+                     origin.endsWith(".onrender.com");
+
+    if (isAllowed) {
       callback(null, true);
     } else {
-      // For production, you might want to be stricter, but let's be safe for now
-      callback(null, true); 
+      // In production, you might want to be stricter, but we allow all for now to fix access issues
+      // and let the application logic handle security where needed.
+      callback(null, true);
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
+
+// Explicitly handle OPTIONS preflight requests for all routes
+app.options("*", cors());
 
 // 2. Body Parser
 app.use(express.json());
