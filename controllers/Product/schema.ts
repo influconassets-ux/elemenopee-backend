@@ -27,8 +27,13 @@ export const ProductCreateSchema = z.object({
   sizeRange: z.string().optional(),
   fitType: z.string().optional(),
   length: z.string().optional(),
+  topLength: z.string().optional(),
+  chestWidth: z.string().optional(),
   chestWaist: z.string().optional(),
   shoulderWidth: z.string().optional(),
+  bottomLength: z.string().optional(),
+  bottomWaist: z.string().optional(),
+  hip: z.string().optional(),
   sleeveLength: z.string().optional(),
   neckType: z.string().optional(),
   closureType: z.string().optional(),
@@ -42,7 +47,9 @@ export const ProductCreateSchema = z.object({
   transparent: z.string().optional(),
   patternPrint: z.string().optional(),
   printPlacement: z.string().optional(),
-  printTechnique: z.string().optional()
+  printTechnique: z.string().optional(),
+  occasion: z.string().optional(),
+  theme: z.string().optional()
 });
 
 export const ProductUpdateSchema = ProductCreateSchema.partial();

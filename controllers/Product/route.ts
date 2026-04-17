@@ -44,8 +44,13 @@ const processRow = async (row: any, index: number) => {
     const sizeRange = getVal(item, "sizeRange", ["Size Range", "size range", "sizeRange"]);
     const fitType = getVal(item, "fitType", ["Fit Type", "fit type", "fitType"]);
     const length = getVal(item, "length", ["Length", "length"]);
+    const topLength = getVal(item, "topLength", ["Top Length", "top length", "topLength"]);
+    const chestWidth = getVal(item, "chestWidth", ["Chest Width", "chest width", "chestWidth"]);
     const chestWaist = getVal(item, "chestWaist", ["Chest Waist", "chest waist", "chestWaist", "Chest/Waist"]);
     const shoulderWidth = getVal(item, "shoulderWidth", ["Shoulder Width", "shoulder width", "shoulderWidth"]);
+    const bottomLength = getVal(item, "bottomLength", ["Bottom Length", "bottom length", "bottomLength"]);
+    const bottomWaist = getVal(item, "bottomWaist", ["Bottom Waist", "bottom waist", "bottomWaist"]);
+    const hip = getVal(item, "hip", ["Hip", "hip"]);
     const sleeveLength = getVal(item, "sleeveLength", ["Sleeve Length", "sleeve length", "sleeveLength", "Sleeve"]);
     const neckType = getVal(item, "neckType", ["Neck Type", "neck type", "neckType", "Neck"]);
     const closureType = getVal(item, "closureType", ["Closure Type", "closure type", "closureType", "Closure"]);
@@ -60,6 +65,8 @@ const processRow = async (row: any, index: number) => {
     const patternPrint = getVal(item, "patternPrint", ["Pattern / Print", "Pattern", "Print", "patternPrint", "Pattern/Print"]);
     const printPlacement = getVal(item, "printPlacement", ["Print Placement", "print placement", "printPlacement"]);
     const printTechnique = getVal(item, "printTechnique", ["Print Technique", "print technique", "printTechnique"]);
+    const occasion = getVal(item, "occasion", ["Occasion", "occasion"]);
+    const theme = getVal(item, "theme", ["Theme", "theme"]);
     
     // Support both comma-separated links column AND individual Photo 1-5 columns
     const rawDriveLinks = getVal(item, "googleDriveImageLinks", [
@@ -123,8 +130,13 @@ const processRow = async (row: any, index: number) => {
       sizeRange: sizeRange ? String(sizeRange) : undefined,
       fitType: fitType ? String(fitType) : undefined,
       length: length ? String(length) : undefined,
+      topLength: topLength ? String(topLength) : undefined,
+      chestWidth: chestWidth ? String(chestWidth) : undefined,
       chestWaist: chestWaist ? String(chestWaist) : undefined,
       shoulderWidth: shoulderWidth ? String(shoulderWidth) : undefined,
+      bottomLength: bottomLength ? String(bottomLength) : undefined,
+      bottomWaist: bottomWaist ? String(bottomWaist) : undefined,
+      hip: hip ? String(hip) : undefined,
       sleeveLength: sleeveLength ? String(sleeveLength) : undefined,
       neckType: neckType ? String(neckType) : undefined,
       closureType: closureType ? String(closureType) : undefined,
@@ -138,7 +150,9 @@ const processRow = async (row: any, index: number) => {
       transparent: transparent ? String(transparent) : undefined,
       patternPrint: patternPrint ? String(patternPrint) : undefined,
       printPlacement: printPlacement ? String(printPlacement) : undefined,
-      printTechnique: printTechnique ? String(printTechnique) : undefined
+      printTechnique: printTechnique ? String(printTechnique) : undefined,
+      occasion: occasion ? String(occasion) : undefined,
+      theme: theme ? String(theme) : undefined
     };
 
     const product = new Product(productData);

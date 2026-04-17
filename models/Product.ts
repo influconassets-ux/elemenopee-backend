@@ -25,8 +25,13 @@ const productSchema = new mongoose.Schema({
   sizeRange: String,
   fitType: String,
   length: String,
+  topLength: String,
+  chestWidth: String,
   chestWaist: String,
   shoulderWidth: String,
+  bottomLength: String,
+  bottomWaist: String,
+  hip: String,
   sleeveLength: String,
   neckType: String,
   closureType: String,
@@ -40,7 +45,9 @@ const productSchema = new mongoose.Schema({
   transparent: String,
   patternPrint: String,
   printPlacement: String,
-  printTechnique: String
+  printTechnique: String,
+  occasion: String,
+  theme: String
 }, { timestamps: true });
 
 const Product = mongoose.model("Product", productSchema);

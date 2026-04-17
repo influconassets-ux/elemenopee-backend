@@ -33,42 +33,31 @@ const allowedOrigins = [
   "https://sensational-sawine-303205.netlify.app",
   "https://dashboard.viridiv.com",
   "https://viridiv.com",
-  "https://elemenopee.netlify.app"
+  "https://elemenopee-backend-e7cv.onrender.com",
 ];
 
+// 1. Request Logger (Placed at the very top to see ALL requests including pre-flight)
+app.use((req, res, next) => {
+  const origin = req.get('origin') || 'No Origin';
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${origin}`);
+  next();
+});
+
+// 2. CORS Configuration
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
-    if (!origin) return callback(null, true);
-    
-    const isAllowed = allowedOrigins.includes(origin) || 
-                     origin.endsWith(".netlify.app") || 
-                     origin.endsWith(".onrender.com");
-
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      // In production, you might want to be stricter, but we allow all for now to fix access issues
-      // and let the application logic handle security where needed.
-      callback(null, true);
-    }
+    // We reflect the origin back to the caller to ensure Access-Control-Allow-Origin matches
+    // This is the most permissive way to solve CORS issues during debugging.
+    callback(null, true);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+  optionsSuccessStatus: 200
 }));
 
-// 2. Body Parser
+// 3. Body Parser
 app.use(express.json());
-
-// 3. Request Logger (move after CORS to see what's happening)
-
-// Request Logger
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - Origin: ${req.get('origin')}`);
-  next();
-});
 
 // Swagger Documentation
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
@@ -93,7 +82,15 @@ app.use("/api/reviews", reviewRoutes);
 
 // Health check endpoint for render
 app.get("/health", (req, res) => {
-  res.status(200).json({ status: "OK", message: "Server is running" });
+  res.status(200).json({ 
+    status: "OK", 
+    message: "Server is running",
+    env: {
+      hasJwtSecret: !!process.env.JWT_SECRET,
+      hasMongoUrl: !!process.env.MONGO_URL,
+      nodeEnv: process.env.NODE_ENV
+    }
+  });
 });
 
 // Root endpoint
