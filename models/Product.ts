@@ -47,7 +47,13 @@ const productSchema = new mongoose.Schema({
   printPlacement: String,
   printTechnique: String,
   occasion: String,
-  theme: String
+  theme: String,
+  variants: [{
+    size: String,
+    skuId: String,
+    inventory: { type: Number, default: 0 }
+  }],
+  inventory: { type: Number, default: 0 }
 }, { timestamps: true });
 
 const Product = mongoose.model("Product", productSchema);

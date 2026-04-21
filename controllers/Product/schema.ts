@@ -6,7 +6,7 @@ export const ProductCreateSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   size: z.array(z.string()).optional(),
-  skuId: z.string().min(1, 'SKU ID is required'),
+  skuId: z.string().optional(),
   price: z.number().min(0, 'Price must be non-negative').optional(),
   discountedPrice: z.number().min(0, 'Discounted price must be non-negative').optional(),
   discountPercent: z.number().min(0).max(100, 'Discount percentage must be between 0 and 100').optional(),
@@ -49,7 +49,13 @@ export const ProductCreateSchema = z.object({
   printPlacement: z.string().optional(),
   printTechnique: z.string().optional(),
   occasion: z.string().optional(),
-  theme: z.string().optional()
+  theme: z.string().optional(),
+  variants: z.array(z.object({
+    size: z.string().optional(),
+    skuId: z.string().optional(),
+    inventory: z.number().optional()
+  })).optional(),
+  inventory: z.number().min(0).optional()
 });
 
 export const ProductUpdateSchema = ProductCreateSchema.partial();

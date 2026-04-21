@@ -2,6 +2,7 @@ import express from "express";
 import Order from "../../models/Order.js";
 import User from "../../models/User.js";
 import AbandonedCart from "../../models/AbandonedCart.js";
+import Product from "../../models/Product.js";
 import { validateRequest } from "../../utils/validation.js";
 import { OrderSchemas } from "./schema.js";
 import { authenticate, type AuthenticatedRequest } from "../User/auth.js";
@@ -250,6 +251,28 @@ router.post(
         order.user = req.auth.userId as any;
       }
       await order.save();
+      
+      // Reduce inventory for each item
+      try {
+        if (req.body.items && Array.isArray(req.body.items)) {
+          for (const item of req.body.items) {
+            const quantity = parseInt(item.quantity) || 1;
+            if (item.productId) {
+              await Product.findByIdAndUpdate(item.productId, {
+                $inc: { inventory: -quantity }
+              });
+            } else if (item.skuId) {
+               await Product.findOneAndUpdate({ skuId: item.skuId }, {
+                $inc: { inventory: -quantity }
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error reducing inventory:", err);
+        // We don't want to fail the order if inventory update fails, 
+        // but it's worth logging.
+      }
 
       // Mark abandoned cart as recovered if it exists
       try {

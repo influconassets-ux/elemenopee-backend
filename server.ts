@@ -18,6 +18,7 @@ import updateRoutes from "./routes/updateRoutes.js";
 import homeCategoryRoutes from "./routes/homeCategoryRoutes.js";
 import homeHeroCategoryRoutes from "./routes/homeHeroCategoryRoutes.js";
 import homeLatestStyleRoutes from "./routes/homeLatestStyleRoutes.js";
+import homeNewDropRoutes from "./routes/homeNewDropRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import { specs } from "./swagger.js";
@@ -78,6 +79,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/home-categories", homeCategoryRoutes);
 app.use("/api/home-hero-categories", homeHeroCategoryRoutes);
 app.use("/api/home-latest-styles", homeLatestStyleRoutes);
+app.use("/api/home-new-drops", homeNewDropRoutes);
 app.use("/api/reviews", reviewRoutes);
 
 // Health check endpoint for render

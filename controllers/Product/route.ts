@@ -67,6 +67,7 @@ const processRow = async (row: any, index: number) => {
     const printTechnique = getVal(item, "printTechnique", ["Print Technique", "print technique", "printTechnique"]);
     const occasion = getVal(item, "occasion", ["Occasion", "occasion"]);
     const theme = getVal(item, "theme", ["Theme", "theme"]);
+    const inventory = getVal(item, "inventory", ["stock", "quantity", "Quantity", "Inventory", "stockLevel", "Stock Level"]);
     
     // Support both comma-separated links column AND individual Photo 1-5 columns
     const rawDriveLinks = getVal(item, "googleDriveImageLinks", [
@@ -152,7 +153,8 @@ const processRow = async (row: any, index: number) => {
       printPlacement: printPlacement ? String(printPlacement) : undefined,
       printTechnique: printTechnique ? String(printTechnique) : undefined,
       occasion: occasion ? String(occasion) : undefined,
-      theme: theme ? String(theme) : undefined
+      theme: theme ? String(theme) : undefined,
+      inventory: inventory !== undefined ? parseInt(String(inventory)) : 0
     };
 
     const product = new Product(productData);
