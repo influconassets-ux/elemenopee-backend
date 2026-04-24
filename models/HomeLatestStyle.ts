@@ -11,7 +11,7 @@ const HomeLatestStyleSchema: Schema = new Schema(
   {
     title: { type: String, required: false },
     imageUrl: { type: String, required: true },
-    redirectUrl: { type: String, required: true },
+    redirectUrl: { type: String, required: false },
     order: { type: Number, default: 0 },
   },
   { timestamps: true }

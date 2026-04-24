@@ -4,7 +4,7 @@ const productSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: String,
   size: [String],
-  skuId: { type: String, unique: true },
+  skuId: { type: String, unique: true, sparse: true },
   price: Number,
   discountedPrice: Number,
   discountPercent: Number,

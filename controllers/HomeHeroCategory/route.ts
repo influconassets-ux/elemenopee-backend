@@ -13,6 +13,19 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/:id", async (req, res) => {
+  try {
+    const heroCat = await HomeHeroCategory.findById(req.params.id);
+    if (!heroCat) {
+      return res.status(404).json({ error: "Hero category not found" });
+    }
+    res.json(heroCat);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
 router.post("/", async (req, res) => {
   try {
     const heroCat = new HomeHeroCategory(req.body);
