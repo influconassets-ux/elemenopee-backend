@@ -5,11 +5,13 @@ import Order from "../../models/Order.js";
 import { validateRequest } from "../../utils/validation.js";
 import { UserSchemas } from "./schema.js";
 import { authenticate, AuthenticatedRequest, generateToken } from "./auth.js";
+import { authLimiter } from "../../middleware/rateLimiter.js";
 
 const router: express.Router = express.Router();
 
 router.post(
   "/register",
+  authLimiter,
   validateRequest({ body: UserSchemas.register }),
   async (req, res) => {
     try {
@@ -51,6 +53,7 @@ router.post(
 
 router.post(
   "/login",
+  authLimiter,
   validateRequest({ body: UserSchemas.login }),
   async (req, res) => {
     try {
@@ -77,6 +80,7 @@ router.post(
 
 router.post(
   "/sync",
+  authLimiter,
   validateRequest({ body: UserSchemas.sync }),
   async (req, res) => {
     try {
@@ -171,7 +175,13 @@ router.put(
 router.get("/orders", authenticate, async (req: AuthenticatedRequest, res) => {
   try {
     if (req.auth?.userId) {
-      const orders = await Order.find({ user: req.auth.userId })
+      const orders = await Order.find({ 
+        user: req.auth.userId,
+        $or: [
+          { paymentMethod: "COD" },
+          { paymentMethod: "Razorpay", paymentStatus: "paid" }
+        ]
+      })
         .sort({ createdAt: -1 })
         .populate("items.productId");
       res.json(orders);

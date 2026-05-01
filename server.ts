@@ -21,11 +21,17 @@ import homeLatestStyleRoutes from "./routes/homeLatestStyleRoutes.js";
 import homeNewDropRoutes from "./routes/homeNewDropRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import couponRoutes from "./routes/couponRoutes.js";
+import contactRoutes from "./routes/contactRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
+import securityRoutes from "./controllers/Security/route.js";
 import { specs } from "./swagger.js";
+import { globalLimiter } from "./middleware/rateLimiter.js";
 
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 
 // 1. CORS Configuration
 const allowedOrigins = [
@@ -59,6 +65,7 @@ app.use(cors({
 
 // 3. Body Parser
 app.use(express.json());
+app.use(globalLimiter);
 
 // Swagger Documentation
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
@@ -81,6 +88,10 @@ app.use("/api/home-hero-categories", homeHeroCategoryRoutes);
 app.use("/api/home-latest-styles", homeLatestStyleRoutes);
 app.use("/api/home-new-drops", homeNewDropRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/coupons", couponRoutes);
+app.use("/api/contacts", contactRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/security", securityRoutes);
 
 // Health check endpoint for render
 app.get("/health", (req, res) => {

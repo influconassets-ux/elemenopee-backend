@@ -53,7 +53,8 @@ const productSchema = new mongoose.Schema({
     skuId: String,
     inventory: { type: Number, default: 0 }
   }],
-  inventory: { type: Number, default: 0 }
+  inventory: { type: Number, default: 0 },
+  hsnCode: { type: String, default: "610439" }
 }, { timestamps: true });
 
 const Product = mongoose.model("Product", productSchema);

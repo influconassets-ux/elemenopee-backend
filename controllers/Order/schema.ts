@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { 
-  ObjectIdSchema, 
-  PaginationQuerySchema, 
-  OrderItemSchema, 
+import {
+  ObjectIdSchema,
+  PaginationQuerySchema,
+  OrderItemSchema,
   ShippingAddressSchema,
   PaymentStatusEnum,
   OrderStatusEnum
@@ -27,7 +27,8 @@ export const OrderCreateSchema = z.object({
   orderStatus: OrderStatusEnum.default('pending').optional(),
   trackingNumber: z.string().optional(),
   notes: z.string().optional(),
-  estimatedDelivery: z.string().datetime('Invalid date format').optional()
+  estimatedDelivery: z.string().datetime('Invalid date format').optional(),
+  appliedCouponCode: z.string().optional(),
 });
 
 export const OrderUpdateSchema = OrderCreateSchema.partial();

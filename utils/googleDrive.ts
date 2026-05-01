@@ -55,13 +55,13 @@ const downloadImageAsBuffer = async (url: string, fileId?: string): Promise<Buff
 
             if (contentType.includes('text/html') || byteLength < 1000) {
                 console.warn(`[Image Download] ⚠️ Warning: Link returned a webpage/small file instead of an image. Content-Type: ${contentType}`);
-                continue; 
+                continue;
             }
 
             const buffer = Buffer.from(response.data);
             const header = buffer.toString('hex', 0, 4);
             const isValidImage = /^(ffd8ff|89504e47|47494638|52494646)/.test(header);
-            
+
             if (isValidImage) {
                 console.log(`[Image Download] ✅ Success! Fetched ${byteLength} bytes (${contentType})`);
                 return buffer;
@@ -83,11 +83,12 @@ const uploadToCloudinary = async (fileSource: Buffer | string, filename: string)
             // If it's a URL (string), Cloudinary can fetch it directly
             formData.append("file", fileSource);
         }
-        
-        formData.append("upload_preset", "dummy-elem-upload");
+
+        formData.append("upload_preset", "elemenopee");
+        formData.append("folder", "elemenopee");
 
         const res = await axios.post(
-            "https://api.cloudinary.com/v1_1/driz5nrim/image/upload",
+            "https://api.cloudinary.com/v1_1/dpjcwbxhp/image/upload",
             formData,
             { headers: { ...formData.getHeaders() } }
         );
@@ -105,7 +106,7 @@ const getDropboxDirectLink = (url: string): string | null => {
     let directUrl = url.split('?')[0];
     const rlkeyMatch = url.match(/rlkey=([a-zA-Z0-9_-]+)/);
     const rlkeyParam = rlkeyMatch ? `&rlkey=${rlkeyMatch[1]}` : '';
-    
+
     if (directUrl.includes('www.dropbox.com')) {
         return directUrl + '?raw=1' + rlkeyParam;
     } else {
@@ -118,7 +119,7 @@ export const fetchImagesFromDirectLinks = async (linksString: string): Promise<s
 
     const normalizedString = linksString.replace(/[\u200b-\u200d\ufeff]/g, '').trim();
     const links = normalizedString.match(/(?:https?:\/\/|www\.)[^\s,;|]+(?:\?[^\s,;|]*)?/g) || [];
-    
+
     if (links.length === 0) return [];
 
     const processLink = async (url: string, index: number): Promise<string | null> => {
@@ -139,15 +140,15 @@ export const fetchImagesFromDirectLinks = async (linksString: string): Promise<s
             if (finalUrl.includes('drive.google.com') || finalUrl.includes('docs.google.com')) {
                 const fileId = extractFileId(finalUrl);
                 if (!fileId) return null;
-                
+
                 // Try passing the direct content link to Cloudinary first? 
                 // Actually, let's stick to buffer for Drive as it's more reliable for private-ish links
                 const imageBuffer = await downloadImageAsBuffer('', fileId);
                 if (imageBuffer) {
                     return await uploadToCloudinary(imageBuffer, `drive_${Date.now()}_${index}.jpg`);
                 }
-            } 
-            
+            }
+
             // 3. For any other direct image URI, let Cloudinary fetch it directly
             if (finalUrl.match(/\.(jpg|jpeg|png|webp|gif|avif)($|\?)/i)) {
                 console.log("[Processor] Passing direct Image link to Cloudinary");
@@ -159,7 +160,7 @@ export const fetchImagesFromDirectLinks = async (linksString: string): Promise<s
             if (imageBuffer) {
                 return await uploadToCloudinary(imageBuffer, `import_${Date.now()}_${index}.jpg`);
             }
-            
+
             return null;
         } catch (err: any) {
             console.error(`[Processor] Error:`, err.message);

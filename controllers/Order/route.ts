@@ -3,10 +3,13 @@ import Order from "../../models/Order.js";
 import User from "../../models/User.js";
 import AbandonedCart from "../../models/AbandonedCart.js";
 import Product from "../../models/Product.js";
+import { Coupon } from "../../models/Coupon.js";
 import { validateRequest } from "../../utils/validation.js";
 import { OrderSchemas } from "./schema.js";
 import { authenticate, type AuthenticatedRequest } from "../User/auth.js";
 import XLSX from "xlsx";
+import { sendFeedbackEmail } from "../../utils/email.js";
+import Visitor from "../../models/Visitor.js";
 
 const router: express.Router = express.Router();
 
@@ -66,6 +69,8 @@ router.get(
   async (req, res) => {
     console.log(`[Stats Endpoint] Hit by origin: ${req.headers.origin}`);
     try {
+      const { startDate, endDate } = req.query;
+      
       const now = new Date();
       const startOfDay = new Date(now);
       startOfDay.setHours(0, 0, 0, 0);
@@ -77,41 +82,93 @@ router.get(
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-      const SALE_FILTER = {
+      // Base filter for sales
+      const BASE_SALE_FILTER: any = {
         isDeleted: { $ne: true },
         $or: [
-          { paymentStatus: "paid" }, // Any paid order is a sale
-          { paymentMethod: "COD", orderStatus: { $ne: "pending" } } // COD is only a sale once confirmed (not just pending)
+          { paymentStatus: "paid" },
+          { paymentMethod: "COD" } // Include all COD orders as potential revenue
         ],
         orderStatus: { $nin: ["cancelled", "refunded"] },
         paymentStatus: { $nin: ["failed", "refunded"] }
       };
 
-      const [daily, weekly, monthly, yearly, allOrders] = await Promise.all([
+      // Range filter for specific metrics
+      const RANGE_FILTER: any = { ...BASE_SALE_FILTER };
+      if (startDate || endDate) {
+        RANGE_FILTER.createdAt = {};
+        if (startDate) RANGE_FILTER.createdAt.$gte = new Date(startDate as string);
+        if (endDate) RANGE_FILTER.createdAt.$lte = new Date(endDate as string);
+      }
+
+      const visitorRangeFilter: any = {};
+      if (startDate || endDate) {
+        visitorRangeFilter.timestamp = {};
+        if (startDate) visitorRangeFilter.timestamp.$gte = new Date(startDate as string);
+        if (endDate) visitorRangeFilter.timestamp.$lte = new Date(endDate as string);
+      }
+
+      const [daily, weekly, monthly, yearly, allOrders, rangeRevenueData, rangeOrdersCount, totalAddCards, visitorCount, statusCounts] = await Promise.all([
         Order.aggregate([
-          { $match: { ...SALE_FILTER, createdAt: { $gte: startOfDay } } },
+          { $match: { ...BASE_SALE_FILTER, createdAt: { $gte: startOfDay } } },
           { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
         ]),
         Order.aggregate([
-          { $match: { ...SALE_FILTER, createdAt: { $gte: startOfWeek } } },
+          { $match: { ...BASE_SALE_FILTER, createdAt: { $gte: startOfWeek } } },
           { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
         ]),
         Order.aggregate([
-          { $match: { ...SALE_FILTER, createdAt: { $gte: startOfMonth } } },
+          { $match: { ...BASE_SALE_FILTER, createdAt: { $gte: startOfMonth } } },
           { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
         ]),
         Order.aggregate([
-          { $match: { ...SALE_FILTER, createdAt: { $gte: startOfYear } } },
+          { $match: { ...BASE_SALE_FILTER, createdAt: { $gte: startOfYear } } },
           { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
         ]),
-        Order.find({ ...SALE_FILTER }).sort({ createdAt: -1 }).limit(10)
+        Order.find({ ...RANGE_FILTER }).sort({ createdAt: -1 }).limit(10),
+        Order.aggregate([
+          { $match: RANGE_FILTER },
+          { $group: { _id: null, total: { $sum: "$total" } } }
+        ]),
+        Order.countDocuments(RANGE_FILTER),
+        AbandonedCart.countDocuments(startDate ? { createdAt: { $gte: new Date(startDate as string) } } : {}),
+        Visitor.distinct("visitorId", visitorRangeFilter).then(ips => ips.length),
+        Order.aggregate([
+          { 
+            $match: { 
+              isDeleted: { $ne: true },
+              createdAt: RANGE_FILTER.createdAt || { $exists: true }
+            } 
+          },
+          {
+            $group: {
+              _id: "$orderStatus",
+              count: { $sum: 1 }
+            }
+          }
+        ])
       ]);
 
-      // Last 30 days breakdown
+      // Map status counts to a more usable object
+      const counts: any = {
+        pending: 0,
+        confirmed: 0,
+        processing: 0,
+        shipped: 0,
+        delivered: 0
+      };
+      statusCounts.forEach((item: any) => {
+        if (counts.hasOwnProperty(item._id)) {
+          counts[item._id] = item.count;
+        }
+      });
+
+      // Last 30 days breakdown (independent of range filter usually, or should it be?)
+      // Let's keep it 30 days or align with range
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const dailyBreakdown = await Order.aggregate([
-        { $match: { ...SALE_FILTER, createdAt: { $gte: thirtyDaysAgo } } },
+        { $match: { ...BASE_SALE_FILTER, createdAt: { $gte: thirtyDaysAgo } } },
         {
           $group: {
             _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
@@ -128,7 +185,12 @@ router.get(
         monthly: monthly[0] || { total: 0, count: 0 },
         yearly: yearly[0] || { total: 0, count: 0 },
         recentOrders: allOrders,
-        dailyBreakdown
+        dailyBreakdown,
+        totalRevenue: rangeRevenueData[0]?.total || 0,
+        totalOrders: rangeOrdersCount,
+        totalAddCards: totalAddCards,
+        visitors: visitorCount,
+        statusCounts: counts
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
@@ -142,18 +204,26 @@ router.get(
   conditionalAuthenticate,
   async (req, res) => {
     try {
-      const SALE_FILTER = {
+      const { startDate, endDate } = req.query;
+
+      const SALE_FILTER: any = {
         isDeleted: { $ne: true },
         $or: [
           { paymentStatus: "paid" },
-          { paymentMethod: "COD", orderStatus: { $ne: "pending" } }
+          { paymentMethod: "COD" }
         ],
         orderStatus: { $nin: ["cancelled", "refunded"] },
         paymentStatus: { $nin: ["failed", "refunded"] }
       };
 
+      if (startDate || endDate) {
+        SALE_FILTER.createdAt = {};
+        if (startDate) SALE_FILTER.createdAt.$gte = new Date(startDate as string);
+        if (endDate) SALE_FILTER.createdAt.$lte = new Date(endDate as string);
+      }
+
       const orders = await Order.find(SALE_FILTER);
-      
+
       const data = [];
       for (const order of orders) {
         for (const item of order.items) {
@@ -179,9 +249,9 @@ router.get(
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, "Sales Data");
-      
+
       const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-      
+
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", "attachment; filename=sales_report.xlsx");
       res.send(buffer);
@@ -219,11 +289,18 @@ router.get(
   async (req, res) => {
     try {
       const order = await Order.findById(req.params.id).select(
-        "orderStatus paymentStatus items.title items.quantity items.imageUrl customerName createdAt trackingNumber estimatedDelivery"
+        "orderStatus paymentStatus paymentMethod items.title items.quantity items.imageUrl customerName createdAt trackingNumber estimatedDelivery"
       );
+
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
       }
+
+      // If online payment, only allow tracking if it's paid
+      if (order.paymentMethod === "Razorpay" && order.paymentStatus !== "paid") {
+        return res.status(404).json({ error: "Order tracking not available for incomplete payments" });
+      }
+
       res.json(order);
     } catch (err) {
       const errorMessage =
@@ -251,7 +328,7 @@ router.post(
         order.user = req.auth.userId as any;
       }
       await order.save();
-      
+
       // Reduce inventory for each item
       try {
         if (req.body.items && Array.isArray(req.body.items)) {
@@ -262,7 +339,7 @@ router.post(
                 $inc: { inventory: -quantity }
               });
             } else if (item.skuId) {
-               await Product.findOneAndUpdate({ skuId: item.skuId }, {
+              await Product.findOneAndUpdate({ skuId: item.skuId }, {
                 $inc: { inventory: -quantity }
               });
             }
@@ -299,6 +376,22 @@ router.post(
         });
       }
 
+      // Increment coupon usage if applied
+      if (req.body.appliedCouponCode) {
+        try {
+          const coupon = await Coupon.findOne({ code: req.body.appliedCouponCode.toUpperCase() });
+          if (coupon) {
+            coupon.usageCount = (coupon.usageCount || 0) + 1;
+            if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+              coupon.isActive = false;
+            }
+            await coupon.save();
+          }
+        } catch (err) {
+          console.error("Error updating coupon usage:", err);
+        }
+      }
+
       res.status(201).json(order);
     } catch (err) {
       const errorMessage =
@@ -317,12 +410,36 @@ router.put(
   }),
   async (req, res) => {
     try {
+      // Find the order before update to check previous status
+      const oldOrder = await Order.findById(req.params.id);
+      if (!oldOrder) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
       const order = await Order.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
       });
+
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
       }
+
+      // Check if status was changed to delivered
+      if (req.body.orderStatus === "delivered" && oldOrder.orderStatus !== "delivered") {
+        console.log(`[Order Update] Order ${order._id} marked as delivered. Attempting to send feedback email.`);
+
+        if (order.customerEmail) {
+          // Send email asynchronously
+          sendFeedbackEmail(
+            order.customerEmail,
+            order._id.toString(),
+            order.customerName
+          ).catch(err => console.error("Async email error:", err));
+        } else {
+          console.warn(`[Order Update] Could not send feedback email for order ${order._id} because customerEmail is missing.`);
+        }
+      }
+
       res.json(order);
     } catch (err) {
       const errorMessage =

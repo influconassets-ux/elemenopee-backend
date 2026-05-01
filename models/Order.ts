@@ -29,8 +29,10 @@ const orderSchema = new mongoose.Schema(
         discountedPrice: Number,
         size: { type: String, required: true },
         imageUrl: String,
+        hsnCode: { type: String, default: "610439" },
       },
     ],
+    invoiceNumber: String,
     subtotal: { type: Number, required: true },
     tax: { type: Number, default: 0 },
     shippingCost: { type: Number, default: 0 },
@@ -47,7 +49,7 @@ const orderSchema = new mongoose.Schema(
     razorpayPaymentId: { type: String },
     razorpaySignature: { type: String },
 
-    
+
     loyalCoinGiven: { type: Number, required: true },
     paymentStatus: {
       type: String,
@@ -69,6 +71,7 @@ const orderSchema = new mongoose.Schema(
     trackingNumber: String,
     notes: String,
     estimatedDelivery: Date,
+    appliedCouponCode: String,
     isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }
