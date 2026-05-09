@@ -50,7 +50,7 @@ const downloadImageAsBuffer = async (url: string, fileId?: string): Promise<Buff
                 },
             });
 
-            const contentType = response.headers['content-type'] || '';
+            const contentType = String(response.headers['content-type'] || '');
             const byteLength = response.data?.byteLength || 0;
 
             if (contentType.includes('text/html') || byteLength < 1000) {
