@@ -219,4 +219,62 @@ router.get(
   }
 );
 
+router.get("/", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    if (req.auth?.role !== "admin") {
+      return res.status(403).json({ error: "Access denied. Admin only." });
+    }
+    const users = await User.aggregate([
+      {
+        $lookup: {
+          from: "orders",
+          localField: "_id",
+          foreignField: "user",
+          as: "orderDocs",
+        },
+      },
+      {
+        $addFields: {
+          totalSpend: { $sum: "$orderDocs.total" },
+          lastOrderDate: { $max: "$orderDocs.createdAt" },
+          orderCount: { $size: "$orderDocs" }
+        },
+      },
+      {
+        $project: {
+          orderDocs: 0,
+          password: 0,
+        },
+      },
+      { $sort: { createdAt: -1 } },
+    ]);
+    res.json(users);
+  } catch (err) {
+    const errorMessage =
+      err instanceof Error ? err.message : "An unknown error occurred";
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
+router.get("/:id", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    if (req.auth?.role !== "admin") {
+      return res.status(403).json({ error: "Access denied. Admin only." });
+    }
+    const user = await User.findById(req.params.id).populate({
+      path: "orders",
+      options: { sort: { createdAt: -1 } }
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json(user);
+  } catch (err) {
+    const errorMessage =
+      err instanceof Error ? err.message : "An unknown error occurred";
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
 export default router;

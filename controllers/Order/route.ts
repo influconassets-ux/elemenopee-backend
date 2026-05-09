@@ -70,7 +70,7 @@ router.get(
     console.log(`[Stats Endpoint] Hit by origin: ${req.headers.origin}`);
     try {
       const { startDate, endDate } = req.query;
-      
+
       const now = new Date();
       const startOfDay = new Date(now);
       startOfDay.setHours(0, 0, 0, 0);
@@ -108,7 +108,7 @@ router.get(
         if (endDate) visitorRangeFilter.timestamp.$lte = new Date(endDate as string);
       }
 
-      const [daily, weekly, monthly, yearly, allOrders, rangeRevenueData, rangeOrdersCount, totalAddCards, visitorCount, statusCounts] = await Promise.all([
+      const [daily, weekly, monthly, yearly, allOrders, rangeRevenueData, rangeOrdersCount, totalAddCards, visitorCount, statusCounts, customerMetrics, topCities, topStates] = await Promise.all([
         Order.aggregate([
           { $match: { ...BASE_SALE_FILTER, createdAt: { $gte: startOfDay } } },
           { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
@@ -134,11 +134,11 @@ router.get(
         AbandonedCart.countDocuments(startDate ? { createdAt: { $gte: new Date(startDate as string) } } : {}),
         Visitor.distinct("visitorId", visitorRangeFilter).then(ips => ips.length),
         Order.aggregate([
-          { 
-            $match: { 
+          {
+            $match: {
               isDeleted: { $ne: true },
               createdAt: RANGE_FILTER.createdAt || { $exists: true }
-            } 
+            }
           },
           {
             $group: {
@@ -146,6 +146,55 @@ router.get(
               count: { $sum: 1 }
             }
           }
+        ]),
+        // New vs Repeat Customers aggregation
+        Order.aggregate([
+          {
+            $match: RANGE_FILTER
+          },
+          {
+            $group: {
+              _id: { $ifNull: ["$user", "$customerEmail"] },
+              orderCount: { $sum: 1 }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              repeat: {
+                $sum: { $cond: [{ $gt: ["$orderCount", 1] }, 1, 0] }
+              },
+              new: {
+                $sum: { $cond: [{ $eq: ["$orderCount", 1] }, 1, 0] }
+              }
+            }
+          }
+        ]),
+        // Top Cities
+        Order.aggregate([
+          { $match: { ...RANGE_FILTER, "shippingAddress.city": { $exists: true, $ne: "" } } },
+          {
+            $group: {
+              _id: "$shippingAddress.city",
+              count: { $sum: 1 },
+              revenue: { $sum: "$total" }
+            }
+          },
+          { $sort: { count: -1 } },
+          { $limit: 5 }
+        ]),
+        // Top States
+        Order.aggregate([
+          { $match: { ...RANGE_FILTER, "shippingAddress.state": { $exists: true, $ne: "" } } },
+          {
+            $group: {
+              _id: "$shippingAddress.state",
+              count: { $sum: 1 },
+              revenue: { $sum: "$total" }
+            }
+          },
+          { $sort: { count: -1 } },
+          { $limit: 5 }
         ])
       ]);
 
@@ -163,8 +212,7 @@ router.get(
         }
       });
 
-      // Last 30 days breakdown (independent of range filter usually, or should it be?)
-      // Let's keep it 30 days or align with range
+      // Last 30 days breakdown
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const dailyBreakdown = await Order.aggregate([
@@ -190,7 +238,12 @@ router.get(
         totalOrders: rangeOrdersCount,
         totalAddCards: totalAddCards,
         visitors: visitorCount,
-        statusCounts: counts
+        statusCounts: counts,
+        customerMetrics: customerMetrics[0] || { repeat: 0, new: 0 },
+        geoStats: {
+          cities: topCities,
+          states: topStates
+        }
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
