@@ -69,6 +69,72 @@ const processRow = async (row: any, index: number) => {
     const theme = getVal(item, "theme", ["Theme", "theme"]);
     const inventory = getVal(item, "inventory", ["stock", "quantity", "Quantity", "Inventory", "stockLevel", "Stock Level"]);
     
+    const rawSize = getVal(item, "size", ["sizes", "dimension", "dimensions", "Size Range", "sizeRange", "Size", "Sizes"]);
+    const rawInventory = getVal(item, "inventory", ["stock", "quantity", "Quantity", "Inventory", "stockLevel", "Stock Level", "Size-wise Inventory", "Size wise Inventory", "Sizewise Inventory"]);
+    const rawSku = getVal(item, "skuId", ["sku", "id", "code", "articleNumber", "SKU ID", "styleCode", "Style Code", "SKU", "Article Number"]);
+
+    let variants: any[] = [];
+    let sizeArray: string[] = [];
+    let finalInventory = 0;
+
+    const sizeStr = String(rawSize || "");
+    const invStr = String(rawInventory || "");
+    const skuStr = String(rawSku || "");
+
+    // Helper to split by pipe or comma
+    const splitByAny = (str: string) => {
+      if (!str) return [];
+      if (str.includes("|")) return str.split("|").map(s => s.trim()).filter(Boolean);
+      if (str.includes(",")) return str.split(",").map(s => s.trim()).filter(Boolean);
+      return [str.trim()];
+    };
+
+    // Handle different variant formats
+    if (invStr.includes(":")) {
+      // Format: "2-3 Years: 24 | 3-4 Years: 18" or "2-3 Years: 24, 3-4 Years: 18"
+      const pairs = (invStr.includes("|") ? invStr.split("|") : invStr.split(",")).map(p => p.trim()).filter(Boolean);
+      const skus = splitByAny(skuStr);
+      
+      variants = pairs.map((p, idx) => {
+        const [s, i] = p.split(":").map(x => x.trim());
+        const inv = parseInt(i) || 0;
+        finalInventory += inv;
+        return {
+          size: s,
+          inventory: inv,
+          skuId: skus[idx] || (skuStr.includes("|") || skuStr.includes(",") ? "" : skuStr)
+        };
+      });
+      sizeArray = variants.map(v => v.size);
+    } else if (sizeStr.includes("|") || invStr.includes("|") || sizeStr.includes(",") || invStr.includes(",")) {
+      // Format: Separate columns: Size: "2-3 Years, 3-4 Years", Inventory: "10 | 20"
+      const sizes = splitByAny(sizeStr);
+      const invs = splitByAny(invStr);
+      const skus = splitByAny(skuStr);
+
+      // Use the longer array to ensure we don't miss data
+      const length = Math.max(sizes.length, invs.length);
+      sizeArray = sizes;
+      
+      for (let i = 0; i < length; i++) {
+        const s = sizes[i] || (sizes.length > 0 ? sizes[sizes.length - 1] : "N/A");
+        const inv = parseInt(String(invs[i])) || 0;
+        finalInventory += inv;
+        variants.push({
+          size: s,
+          inventory: inv,
+          skuId: skus[i] || (skus.length === 1 ? skus[0] : "")
+        });
+      }
+    } else {
+      // Simple format
+      sizeArray = sizeStr ? [sizeStr] : [];
+      finalInventory = parseInt(invStr) || 0;
+      if (sizeArray.length === 1) {
+        variants = [{ size: sizeArray[0], inventory: finalInventory, skuId: skuStr }];
+      }
+    }
+
     // Support both comma-separated links column AND individual Photo 1-5 columns
     const rawDriveLinks = getVal(item, "googleDriveImageLinks", [
       "imageLinks", "productImages", "imageUrl", "images", "googleDriveLinks", 
@@ -116,8 +182,8 @@ const processRow = async (row: any, index: number) => {
       subCategory: subCategory ? String(subCategory).toLowerCase() : undefined,
       gender: gender ? String(gender).toLowerCase() : undefined,
       ageGroup: ageGroup ? String(ageGroup).toLowerCase() : undefined,
-      size: typeof sizeString === "string" ? sizeString.split(",").map((s: string) => s.trim()) : [],
-      skuId: skuId,
+      size: sizeArray,
+      skuId: skuStr.includes("|") ? skuStr.split("|")[0].trim() : skuStr,
       variations: variations,
       tags: typeof tagsString === "string" ? tagsString.split(",").map((t: string) => t.trim()) : [],
       imageUrl: images.length > 0 ? images[0] : undefined,
@@ -154,7 +220,8 @@ const processRow = async (row: any, index: number) => {
       printTechnique: printTechnique ? String(printTechnique) : undefined,
       occasion: occasion ? String(occasion) : undefined,
       theme: theme ? String(theme) : undefined,
-      inventory: inventory !== undefined ? parseInt(String(inventory)) : 0
+      inventory: finalInventory,
+      variants: variants
     };
 
     const product = new Product(productData);
@@ -228,6 +295,9 @@ router.post("/bulk-upload", upload.single("file"), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
+
+    // Clear existing products as requested by admin
+    await Product.deleteMany({});
 
     const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];

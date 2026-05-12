@@ -108,7 +108,7 @@ router.get(
         if (endDate) visitorRangeFilter.timestamp.$lte = new Date(endDate as string);
       }
 
-      const [daily, weekly, monthly, yearly, allOrders, rangeRevenueData, rangeOrdersCount, totalAddCards, visitorCount, statusCounts, customerMetrics, topCities, topStates] = await Promise.all([
+      const [daily, weekly, monthly, yearly, allOrders, rangeRevenueData, rangeOrdersCount, totalAddCards, visitorCount, statusCounts, customerMetrics, topCities, topStates, topSKUs] = await Promise.all([
         Order.aggregate([
           { $match: { ...BASE_SALE_FILTER, createdAt: { $gte: startOfDay } } },
           { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } }
@@ -195,6 +195,36 @@ router.get(
           },
           { $sort: { count: -1 } },
           { $limit: 5 }
+        ]),
+        // Top SKUs
+        Order.aggregate([
+          { $match: RANGE_FILTER },
+          { $unwind: "$items" },
+          {
+            $group: {
+              _id: { 
+                skuId: "$items.skuId", 
+                title: "$items.title", 
+                productId: "$items.productId",
+                imageUrl: "$items.imageUrl"
+              },
+              quantity: { $sum: "$items.quantity" },
+              revenue: { $sum: { $multiply: ["$items.discountedPrice", "$items.quantity"] } }
+            }
+          },
+          { $sort: { quantity: -1 } },
+          { $limit: 10 },
+          {
+            $project: {
+              _id: 0,
+              skuId: "$_id.skuId",
+              title: "$_id.title",
+              productId: "$_id.productId",
+              imageUrl: "$_id.imageUrl",
+              quantity: 1,
+              revenue: 1
+            }
+          }
         ])
       ]);
 
@@ -243,7 +273,8 @@ router.get(
         geoStats: {
           cities: topCities,
           states: topStates
-        }
+        },
+        topSKUs: topSKUs
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
