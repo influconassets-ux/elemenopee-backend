@@ -53,7 +53,7 @@ router.get(
   validateRequest({ query: OrderSchemas.query }),
   async (req, res) => {
     try {
-      const orders = await Order.find({ isDeleted: { $ne: true } });
+      const orders = await Order.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 });
       res.json(orders);
     } catch (err) {
       const errorMessage =

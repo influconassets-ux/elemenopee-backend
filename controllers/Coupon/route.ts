@@ -15,6 +15,7 @@ export const getActiveCoupons = async (req: Request, res: Response) => {
   try {
     const coupons = await Coupon.find({
       isActive: true,
+      isPublic: true,
       expiryDate: { $gt: new Date() },
       $or: [
         { usageLimit: { $exists: false } },

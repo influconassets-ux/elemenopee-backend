@@ -33,6 +33,10 @@ const couponSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isPublic: {
+      type: Boolean,
+      default: true,
+    },
     usageLimit: {
       type: Number,
     },

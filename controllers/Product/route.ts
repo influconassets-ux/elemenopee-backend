@@ -172,6 +172,21 @@ const processRow = async (row: any, index: number) => {
       parsedDiscountPercent = Math.round(((parsedPrice - parsedDiscountedPrice) / parsedPrice) * 100);
     }
 
+    let mappedAgeGroup = undefined;
+    if (ageGroup) {
+      const agLower = String(ageGroup).trim().toLowerCase();
+      if (agLower === "jnr" || agLower === "junior" || agLower === "juniors" || agLower.includes("2-8")) {
+        mappedAgeGroup = "Junior (2-8 Yrs)";
+      } else if (agLower === "snr" || agLower === "senior" || agLower === "seniors" || agLower.includes("9-16")) {
+        mappedAgeGroup = "Senior (9-16 Yrs)";
+      } else if (agLower === "infant" || agLower === "infants" || agLower.includes("6-24")) {
+        mappedAgeGroup = "Infant (6-24 Months)";
+      } else {
+        // Standard capitalization
+        mappedAgeGroup = String(ageGroup).trim();
+      }
+    }
+
     const productData = {
       title: title,
       description: description,
@@ -181,7 +196,7 @@ const processRow = async (row: any, index: number) => {
       category: category ? String(category).toLowerCase() : undefined,
       subCategory: subCategory ? String(subCategory).toLowerCase() : undefined,
       gender: gender ? String(gender).toLowerCase() : undefined,
-      ageGroup: ageGroup ? String(ageGroup).toLowerCase() : undefined,
+      ageGroup: mappedAgeGroup,
       size: sizeArray,
       skuId: skuStr.includes("|") ? skuStr.split("|")[0].trim() : skuStr,
       variations: variations,
