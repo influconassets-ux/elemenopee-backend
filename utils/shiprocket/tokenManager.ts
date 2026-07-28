@@ -1,5 +1,5 @@
 import axios from "axios";
-import { SHIPROCKET_CONFIG } from "./config";
+import { SHIPROCKET_CONFIG } from "./config.js";
 
 let cachedToken: string | null = null;
 let tokenExpiry: number | null = null;

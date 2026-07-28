@@ -1,5 +1,5 @@
-import { SHIPROCKET_CONFIG } from "./config";
-import { getShiprocketClient } from "./client";
+import { SHIPROCKET_CONFIG } from "./config.js";
+import { getShiprocketClient } from "./client.js";
 
 export interface IShippingProvider {
   createOrder(orderData: any): Promise<any>;

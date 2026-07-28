@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from "axios";
-import { SHIPROCKET_CONFIG } from "./config";
-import { getShiprocketToken } from "./tokenManager";
+import { SHIPROCKET_CONFIG } from "./config.js";
+import { getShiprocketToken } from "./tokenManager.js";
 
 export const getShiprocketClient = async (): Promise<AxiosInstance> => {
   const token = await getShiprocketToken();
