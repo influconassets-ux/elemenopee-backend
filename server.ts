@@ -25,6 +25,9 @@ import couponRoutes from "./routes/couponRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import securityRoutes from "./controllers/Security/route.js";
+import webhookRoutes from "./controllers/Webhook/route.js";
+import adminShipmentRoutes from "./controllers/AdminShipment/route.js";
+import { initializeShippingJobs } from "./utils/jobs/shippingJobs.js";
 import { specs } from "./swagger.js";
 import { globalLimiter } from "./middleware/rateLimiter.js";
 
@@ -40,7 +43,7 @@ const allowedOrigins = [
   "https://sensational-sawine-303205.netlify.app",
   "https://dashboard.viridiv.com",
   "https://viridiv.com",
-  "https://elemenopee-backend-e7cv.onrender.com",
+  "https://elemenopee-backend-n18p.onrender.com",
 ];
 
 // 1. Request Logger (Placed at the very top to see ALL requests including pre-flight)
@@ -58,7 +61,7 @@ app.use(cors({
     callback(null, true);
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
   optionsSuccessStatus: 200
 }));
@@ -92,6 +95,8 @@ app.use("/api/coupons", couponRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/security", securityRoutes);
+app.use("/api/webhooks", webhookRoutes);
+app.use("/api/admin-shipments", adminShipmentRoutes);
 
 // Health check endpoint for render
 app.get("/health", (req, res) => {
@@ -145,6 +150,7 @@ mongoose
   .connect(MongoDB_Url)
   .then(() => {
     console.log("MongoDB Connected ✅");
+    initializeShippingJobs(); // Start background jobs once DB connects
   })
   .catch((err) => {
     console.log("MongoDB_Url", MongoDB_Url);

@@ -42,12 +42,32 @@ export const verifyPayment = async (req: Request, res: Response) => {
   if (expectedSignature === razorpay_signature) {
     // Payment is verified
     try {
-      await Order.findByIdAndUpdate(orderId, {
+      const order = await Order.findByIdAndUpdate(orderId, {
         paymentStatus: "paid",
         razorpayOrderId: razorpay_order_id,
         razorpayPaymentId: razorpay_payment_id,
         razorpaySignature: razorpay_signature,
-      });
+      }, { new: true });
+
+      if (order) {
+        // Import Shipment model dynamically to avoid circular dependencies or just require it
+        const Shipment = (await import("../models/Shipment.js")).default;
+        
+        // Ensure no duplicate shipment is created
+        const existingShipment = await Shipment.findOne({ orderId: order._id });
+        if (!existingShipment) {
+          const shipment = new Shipment({
+            orderId: order._id,
+            merchantOrderId: order._id.toString(),
+            paymentMethod: "Prepaid",
+            codAmount: 0,
+            internalStatus: "PENDING",
+            testMode: process.env.SHIPROCKET_MODE === "mock"
+          });
+          await shipment.save();
+        }
+      }
+
       res.status(200).json({ status: "success", message: "Payment verified successfully" });
     } catch (error) {
       console.error("Order update error:", error);

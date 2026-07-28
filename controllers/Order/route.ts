@@ -3,6 +3,7 @@ import Order from "../../models/Order.js";
 import User from "../../models/User.js";
 import AbandonedCart from "../../models/AbandonedCart.js";
 import Product from "../../models/Product.js";
+import Shipment from "../../models/Shipment.js";
 import { Coupon } from "../../models/Coupon.js";
 import { validateRequest } from "../../utils/validation.js";
 import { OrderSchemas } from "./schema.js";
@@ -413,6 +414,22 @@ router.post(
       }
       await order.save();
 
+      // Create initial Shipment record only if COD or already paid
+      if (req.body.paymentMethod === "COD" || order.paymentStatus === "paid") {
+        try {
+          const shipment = new Shipment({
+            orderId: order._id,
+            merchantOrderId: order._id.toString(),
+            paymentMethod: req.body.paymentMethod === "COD" ? "COD" : "Prepaid",
+            codAmount: req.body.paymentMethod === "COD" ? order.total : 0,
+            internalStatus: "PENDING",
+            testMode: process.env.SHIPROCKET_MODE === "mock"
+          });
+          await shipment.save();
+        } catch (err) {
+          console.error("Error creating initial shipment:", err);
+        }
+      }
       // Reduce inventory for each item
       try {
         if (req.body.items && Array.isArray(req.body.items)) {
