@@ -30,7 +30,7 @@ router.post("/shipping-status", async (req, res) => {
       return res.status(200).send("OK");
     }
 
-    const internalStatus = mapShiprocketStatusToInternal(currentStatusId);
+    const internalStatus = mapShiprocketStatusToInternal(currentStatusId) as "PENDING" | "PROCESSING" | "READY_TO_SHIP" | "SHIPPED" | "IN_TRANSIT" | "DELIVERED" | "RTO_INITIATED" | "RTO_DELIVERED" | "CANCELLED" | "ERROR";
 
     // Save event
     const event = new ShipmentEvent({
